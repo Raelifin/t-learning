@@ -95,7 +95,7 @@ def avg_choice_log_likelihood(trajectories, policy):
     return tf.reduce_mean(tf.log(gathered_likelihoods))
 
 def avg_transition_log_likelihood(trajectories, transition_model):
-    outcomes = np.expand_dims(trajectories[:, 1:, 0], axis=-1)
+    outcomes = trajectories[:, 1:, 0:1]  # 0:1 extracts "state" in a ("state", "action") pair
     state_action_states = np.concatenate((trajectories[:, :-1, :], outcomes), axis=-1)
     transitions = np.reshape(state_action_states, [-1, 3])
     gathered_likelihoods = tf.gather_nd(transition_model, transitions)
@@ -122,6 +122,7 @@ def infer_transition_model(trajectories, rewards, base_transition_model=None, in
     # Set up value iteration and use a softmax policy so there's a gradient
     v, q = value_iteration(transition_model, rewards, max_iters=value_iter_horizon)
     pi = compute_policy(q, use_softmax=True)
+
     # Try and maximize the likelihood of the demonstrator's choices
     choice_log_likelihood = avg_choice_log_likelihood(trajectories, pi)
     # Also try and maximize the demonstrator's correctness
