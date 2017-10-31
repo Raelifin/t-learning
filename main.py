@@ -104,8 +104,8 @@ def avg_transition_log_likelihood(trajectories, transition_model):
 def build_transition_logits_init(base_transition_model):
     base_transition_model += 1e-9  # Add epislon to the transition matrix to prevent divide by zero
     tiling = base_transition_model.shape[-1]
-    rescaling = np.tile(np.expand_dims(np.sum(base_transition_model, -1), axis=-1), tiling)
-    base_transition_logits = np.log(rescaling * base_transition_model)
+    rescaling = np.tile(np.expand_dims(np.sum(base_transition_model, axis=-1), axis=-1), tiling)
+    base_transition_logits = np.log(base_transition_model / rescaling)
     return tf.constant_initializer(base_transition_logits)
 
 def compute_kl_divergence(p1, p2):
