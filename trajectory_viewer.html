@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trajectory Visualization</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="data/demonstration_trajectories.js"></script>
+    <script src="data/inferred_model_trajectories.js"></script>
+    <script>
+        /* From https://stackoverflow.com/questions/17242144/javascript-convert-hsb-hsv-color-to-rgb-accurately */
+        function HSVtoRGB(h, s, v) {
+            var r, g, b, i, f, p, q, t;
+            if (arguments.length === 1) {
+                s = h.s, v = h.v, h = h.h;
+            }
+            i = Math.floor(h * 6);
+            f = h * 6 - i;
+            p = v * (1 - s);
+            q = v * (1 - f * s);
+            t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v, g = t, b = p; break;
+                case 1: r = q, g = v, b = p; break;
+                case 2: r = p, g = v, b = t; break;
+                case 3: r = p, g = q, b = v; break;
+                case 4: r = t, g = p, b = v; break;
+                case 5: r = v, g = p, b = q; break;
+            }
+            return {
+                r: Math.round(r * 255),
+                g: Math.round(g * 255),
+                b: Math.round(b * 255)
+            };
+        }
+
+        const ACTION_DELTAS = [[-1, 0], [0, 1], [1, 0], [0, -1]]
+
+        const nS = 16
+        const nA = 4
+
+        let mousePos = [-1, -1]
+
+        function setMousePos(mouseEvent) {
+            const canvas = document.getElementById('paper')
+            const rect = canvas.getBoundingClientRect()
+            mousePos = [mouseEvent.clientX - rect.left, mouseEvent.clientY - rect.top]
+        }
+
+        function color_string_of_time(t, max_t) {
+            const rgb = HSVtoRGB(t / max_t, 1, 0.8)
+            return rgb.r + ', ' + rgb.g + ', ' + rgb.b
+        }
+
+        function draw() {
+            const trajectories = document.getElementById('viewInferredModelTrajectories').checked
+                ? inferredModelTrajectories
+                : demonstrationTrajectories
+
+            const canvas = document.getElementById('paper')
+            const ctx = canvas.getContext('2d')
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+            let hover = null
+
+            ctx.strokeStyle = 'rgba(0,0,0,1)'
+            ctx.lineWidth = 1
+            for (let s=0; s < nS; s++) {
+                const col = s % 4
+                const row = Math.floor(s / 4)
+                const x = 50 + (col * 140) + 20
+                const y = 50 + (row * 140) + 20
+                ctx.strokeRect(x, y, 100, 100)
+                ctx.fillText(s, x-5+50, y+5+50)
+                if (hover === null) {
+                    if (mousePos[0] > x && mousePos[0] < x + 100 && mousePos[1] > y && mousePos[1] < y + 100) {
+                        hover = s
+                    }
+                }
+            }
+
+            let specificTrajectory = document.getElementById('viewSpecificTrajectory').value
+            if (specificTrajectory && parseInt(specificTrajectory, 10) !== NaN) {
+                specificTrajectory = parseInt(specificTrajectory, 10)
+                if (specificTrajectory < 0 || specificTrajectory >= trajectories.length) {
+                    specificTrajectory = null
+                }
+            } else {
+                specificTrajectory = null
+            }
+
+            const alpha = specificTrajectory !== null ? 1 : 0.1
+            const increment = specificTrajectory !== null ? 1 : 10
+            for (let i=0; i < trajectories.length; i += increment) {
+                if (specificTrajectory !== null && specificTrajectory !== i) {
+                    continue
+                }
+                for (let t=0; t < trajectories[i].length - 1; t++) {
+                    ctx.strokeStyle = 'rgba(' + color_string_of_time(t, trajectories[i].length) + ', ' + alpha + ')'
+                    const s = trajectories[i][t][0]
+                    const a = trajectories[i][t][1]
+                    const s_ = trajectories[i][t+1][0]
+
+                    if (hover !== null && hover !== s) {
+                        continue
+                    }
+
+                    const col = s % 4
+                    const row = Math.floor(s / 4)
+                    const x = 50 + (col * 140) + 20
+                    const y = 50 + (row * 140) + 20
+
+                    ctx.beginPath()
+                    ctx.moveTo(x+50 + 50*ACTION_DELTAS[a][0], y+50 + 50*ACTION_DELTAS[a][1])
+                    if (s == s_) {
+                        const cp1x = x+50 + 100*ACTION_DELTAS[a][0] + 40*ACTION_DELTAS[a][1]
+                        const cp1y = y+50 + 100*ACTION_DELTAS[a][1] + 40*ACTION_DELTAS[a][0]
+                        const cp2x = x+50 + 100*ACTION_DELTAS[a][0] - 40*ACTION_DELTAS[a][1]
+                        const cp2y = y+50 + 100*ACTION_DELTAS[a][1] - 40*ACTION_DELTAS[a][0]
+                        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x+50, y+50)
+                    } else {
+                        const cp1x = x+50 + 100*ACTION_DELTAS[a][0]
+                        const cp1y = y+50 + 100*ACTION_DELTAS[a][1]
+                        const targetCol = s_ % 4
+                        const targetRow = Math.floor(s_ / 4)
+                        const tx = 50 + (targetCol * 140) + 20 + 50
+                        const ty = 50 + (targetRow * 140) + 20 + 50
+                        ctx.bezierCurveTo(cp1x, cp1y, tx, ty, tx, ty)
+                    }
+                    ctx.stroke()
+                }
+            }
+        }
+
+        $(document).ready(function() {
+            draw()
+        })
+    </script>
+    <style type="text/css">
+        body { margin: 0; }
+        input[type=number] { width: 300px; display: block; }
+    </style>
+</head>
+<body>
+    <section>
+        <label>View inferred model trajectories instead of demonstrator trajectories <input id="viewInferredModelTrajectories" type="checkbox" onchange="draw()"/></label>
+        <input id="viewSpecificTrajectory" type="number" step="1" value="" placeholder="Enter a trajectory number here to view it" onchange="draw()"/>
+    </section>
+    <canvas onmousemove="setMousePos(event); draw()" id="paper" width="660" height="660"></canvas>
+</body>
+</html>

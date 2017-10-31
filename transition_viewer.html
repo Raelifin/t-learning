@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Transition Model Visualization</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="data/transition_model.js"></script>
+    <script src="data/true_transition_matrix.js"></script>
+    <script>
+        const ACTION_DELTAS = [[-1, 0], [0, 1], [1, 0], [0, -1]]
+        const COLOR_STRINGS = ['0, 0, 0', '200, 0, 0', '0, 200, 0', '0, 0, 200']
+        const DRAW_ACTION_CHECKBOXES = ['drawLeft', 'drawDown', 'drawRight', 'drawUp']
+
+        let mousePos = [-1, -1]
+
+        function setMousePos(mouseEvent) {
+            const canvas = document.getElementById('paper')
+            const rect = canvas.getBoundingClientRect()
+            mousePos = [mouseEvent.clientX - rect.left, mouseEvent.clientY - rect.top]
+        }
+
+        function draw() {
+            const transitions = document.getElementById('viewTrueTransitions').checked
+                ? trueTransitionMatrix
+                : transitionModel
+
+            const canvas = document.getElementById('paper')
+            const ctx = canvas.getContext('2d')
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+            let hover = null
+
+            ctx.strokeStyle = 'rgba(0,0,0,1)'
+            ctx.lineWidth = 1
+            for (let s=0; s < transitions.length; s++) {
+                const col = s % 4
+                const row = Math.floor(s / 4)
+                const x = 50 + (col * 140) + 20
+                const y = 50 + (row * 140) + 20
+                ctx.strokeRect(x, y, 100, 100)
+                ctx.fillText(s, x-5+50, y+5+50)
+                if (hover === null) {
+                    if (mousePos[0] > x && mousePos[0] < x + 100 && mousePos[1] > y && mousePos[1] < y + 100) {
+                        hover = s
+                    }
+                }
+            }
+            for (let s=0; s < transitions.length; s++) {
+                const col = s % 4
+                const row = Math.floor(s / 4)
+                const x = 50 + (col * 140) + 20
+                const y = 50 + (row * 140) + 20
+
+                if (hover !== null && hover !== s) {
+                    continue
+                }
+
+                for (let a=0; a < transitions[s].length; a++) {
+                    if (document.getElementById(DRAW_ACTION_CHECKBOXES[a]).checked) {
+                        const maxProb = Math.max.apply(null, transitions[s][a])
+                        for (let s_=0; s_ < transitions[s][a].length; s_++) {
+                            const alpha = hover !== null ? Math.sqrt(transitions[s][a][s_] / maxProb) : (transitions[s][a][s_] / maxProb)
+                            ctx.strokeStyle = 'rgba(' + COLOR_STRINGS[a] + ', ' + alpha + ')'
+                            // ctx.lineWidth = (transitions[s][a][s_] / maxProb) * 2
+                            ctx.beginPath()
+                            ctx.moveTo(x+50 + 50*ACTION_DELTAS[a][0], y+50 + 50*ACTION_DELTAS[a][1])
+                            if (s == s_) {
+                                const cp1x = x+50 + 100*ACTION_DELTAS[a][0] + 40*ACTION_DELTAS[a][1]
+                                const cp1y = y+50 + 100*ACTION_DELTAS[a][1] + 40*ACTION_DELTAS[a][0]
+                                const cp2x = x+50 + 100*ACTION_DELTAS[a][0] - 40*ACTION_DELTAS[a][1]
+                                const cp2y = y+50 + 100*ACTION_DELTAS[a][1] - 40*ACTION_DELTAS[a][0]
+                                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x+50, y+50)
+                            } else {
+                                const cp1x = x+50 + 100*ACTION_DELTAS[a][0]
+                                const cp1y = y+50 + 100*ACTION_DELTAS[a][1]
+                                const targetCol = s_ % 4
+                                const targetRow = Math.floor(s_ / 4)
+                                const tx = 50 + (targetCol * 140) + 20 + 50
+                                const ty = 50 + (targetRow * 140) + 20 + 50
+                                ctx.bezierCurveTo(cp1x, cp1y, tx, ty, tx, ty)
+                            }
+                            ctx.stroke()
+                        }
+                    }
+                }
+            }
+        }
+
+        $(document).ready(function() {
+            draw()
+        })
+    </script>
+    <style type="text/css">
+        body { margin: 0; }
+        body > section { margin-left: 70px; }
+    </style>
+</head>
+<body>
+    <section>
+        <label>View true transition matrix <input id="viewTrueTransitions" type="checkbox" onchange="draw()"/></label>
+    </section>
+    <section>
+        Draw:
+        <label>Left <input type="checkbox" id="drawLeft" onchange="draw()" checked/></label> |
+        <label>Down <input type="checkbox" id="drawDown" onchange="draw()" checked/></label> |
+        <label>Right <input type="checkbox" id="drawRight" onchange="draw()" checked/></label> |
+        <label>Up <input type="checkbox" id="drawUp" onchange="draw()" checked/></label>
+    </section>
+    <canvas onmousemove="setMousePos(event); draw()" id="paper" width="660" height="660"></canvas>
+</body>
+</html>
